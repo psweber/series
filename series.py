@@ -31,7 +31,7 @@ tmplFile = "template"
 buildString = "build"
 debug = False
 
-shortOpts = "abdfhimprst:v:C:F:O:T:"
+shortOpts = "abdfhimprst:V:C:F:O:T:"
 longOpts = [
 			"add","all","auto","build","case=",
 			"cases","clean","copy=","createDB=","db=",
