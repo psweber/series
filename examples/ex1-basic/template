@@ -1,0 +1,10 @@
+# INPUT FILE FOR FOOBARSOFT #
+
+height:	8.6
+depth:	1e-2
+width:	---> OPT_WIDTH <---
+
+
+I like ---> OPT_COLOR <---- socks.
+
+Take care.
