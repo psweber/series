@@ -1,0 +1,31 @@
+Example 2 - Making the same plot from multiple data sources
+------------------------------------------------------------
+
+View case 'test':
+$: series --case test --print
+
+The case is linked to the data file data-6.tab
+
+Build case 'test':
+$: series --case test --build
+
+Create plot:
+$: gnuplot plots-test.gp
+
+A PNG file is created, plots-test.png, with the data coming from
+the linked data file
+
+Run case 'final':
+$: series --case final --run --force
+
+Running a case means to build it and to have the run-file(s)
+executed. In this case, the run-file 'template.sh' issues the
+gnuplot command, thus creating the PNG image automatically.
+
+Run all cases:
+$: series --print --cases | while read c; do series --case $c --run --force; done
+
+List the directory and find the PNG files created for the cases.
+
+If a change is to be made to all plots, edit the template.gp file,
+and re-issue the command to run all cases.

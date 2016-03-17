@@ -1,0 +1,22 @@
+-----------------------------------------------
+WARNING: This is an alpha version. Be prepared.
+-----------------------------------------------
+
+Create a new data base:
+$: series --createDB SERIESNAME
+
+Call series without parameters to list often used commands
+$: series
+
+There are four modes: add, delete, modify, print
+Call series with only the mode given to list the related commands
+$: series --modeX
+
+Check the README files in the example directories
+
+Export the data base to get the command sequence that, if executed
+in that order, creates a data base with the same content. You can
+use this function to learn how templates, run-files, and cases are
+added and modified. The export function uses the short versions
+of the parameters.
+$: series --export

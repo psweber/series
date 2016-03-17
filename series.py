@@ -25,6 +25,7 @@
 #
 # Options --------------------------------------------------------------
 #
+version=0.1
 dbFile = "series.db"
 tmplFile = "template"
 buildString = "build"
@@ -38,7 +39,7 @@ longOpts = [
 			"force","withOptions","interactive",
 			"name=","modify","option=",
 			"options","print","reset","run","runFile=","series",
-			"template=","type=","value="
+			"template=","type=","value=","version"
 			]
 
 seriesOptions = ("runFiles","seriesName","templateFiles","templateString")
@@ -325,8 +326,8 @@ def addOptionWithType(optName,optType):
 			sys.exit(1)
 
 		# See if value is given
-		if isCmdLineArgument(opt,'--value','-v'):
-			value = getCmdLineArgument(opt,'--value','-v')
+		if isCmdLineArgument(opt,'--value','-V'):
+			value = getCmdLineArgument(opt,'--value','-V')
 		else:
 			value = ''
 
@@ -718,7 +719,7 @@ def delBuildCase(caseName,force=False):
 def delCase(caseName,force=False):
 	if debug: print("delCase:",caseName,force)
 
-	if isCmdLineArgument(opts,'--force'):
+	if isCmdLineArgument(opts,'--force','-f'):
 		force = True
 
 	cid = verifyCase(caseName)
@@ -882,7 +883,7 @@ def export():
 	seriesName = getValueOfOption('seriesName')
 	templateString = getValueOfOption('templateString')
 	print('series --createDB '+seriesName)
-	print('series -m -O templateString -v '+templateString)
+	print('series -m -O templateString -V '+templateString)
 
 	# Export files, options and cases
 	objects = ['options','files','cases']
@@ -910,7 +911,7 @@ def exportCases():
 
 		opts,vals,files = buildOptionsForCase(case)
 		for o,v in zip(opts,vals):
-			print('series -a -C '+case+' -O '+o+" -v \'"+v+"\'")
+			print('series -a -C '+case+' -O '+o+" -V \'"+v+"\'")
 
 def exportFiles():
 	if debug: print('exportFiles')
@@ -950,7 +951,7 @@ def exportOptions():
 			fName = optFiles.pop()
 
 			if (len(optVal) > 0):
-				print('series -a -t '+optType+' -O '+optName+" -v \'"+optVal+"\' -F "+fName)
+				print('series -a -t '+optType+' -O '+optName+" -V \'"+optVal+"\' -F "+fName)
 			else:
 				print('series -a -t '+optType+' -O '+optName+' -F '+fName)
 
@@ -959,7 +960,7 @@ def exportOptions():
 
 		else:
 			fName = optFiles.pop()
-			print('series -a -O '+optName+" -v \'"+optVal+"\' -F "+fName)
+			print('series -a -O '+optName+" -V \'"+optVal+"\' -F "+fName)
 			while optFiles:
 				fName = optFiles.pop()
 				print('series -a -O '+optName+' -F '+fName)
@@ -1640,6 +1641,10 @@ def printHelp():
 	printHelpDelete()
 	printHelpModify()
 	printHelpPrint()
+	
+	print("\n\t--version\tPrints current program version")
+	printHelpShortOpts()
+	
 
 def printHelpAdd(offset=0):
 	offset += 1
@@ -1748,10 +1753,14 @@ def printHelpPrint(offset=0):
 	print('')
 
 	print(os+"--cases")
-	print(os+'\tPrints all cases and their non-default options')
+	print(os+'\tPrints all cases without options')
+	print('')
+	
+	print(os+"--cases --withOptions")
+	print(os+'\tPrints all cases with options having a non-default value')
 	print('')
 
-	print(os+"--cases --default")
+	print(os+"--cases --withOptions --default")
 	print(os+'\tPrints all cases including options having default values')
 	print('')
 
@@ -1766,12 +1775,43 @@ def printHelpPrint(offset=0):
 	print(os+"--options --series")
 	print(os+'\tPrints all set series options')
 
+def printHelpShortOpts(offset=0):
+	offset += 1
+	os = '\t' * offset
+
+	print('')
+	print(os+"Long and short mode of options")
+	print(os+"Upper case letters require an input value")
+
+	offset += 1
+	os = '\t' * offset
+
+	print(os+"-a --add")
+	print(os+"-b --build")
+	print(os+"-d --delete")
+	print(os+"-f --force")
+	print(os+"-h --help")
+	print(os+"-i --interactive")
+	print(os+"-m --modify")
+	print(os+"-p --print")
+	print(os+"-r --run")
+	print(os+"-s --series")
+	print(os+"-t --type")
+	print('')
+	print(os+"-V --value")
+	print(os+"-C --case")
+	print(os+"-F --file")
+	print(os+"-O --option")
+	print(os+"-T --type")
+	print('')
+	
 # Prints all defined options
 def printOptions(optType):
 	if debug: print("printOptions:",optType)
 	verifyOptionType(optType)
 
 	optRows = []
+	
 	for row in sqlCurs.execute('''
 		SELECT oid,optionName,defaultValue
 		FROM options
@@ -1779,7 +1819,6 @@ def printOptions(optType):
 		ORDER BY optionName''',(optType,)):
 		optRows.append([row[0],row[1],row[2]])
 
-	drop = []
 	for i in range(len(optRows)):
 		optName = optRows[i][1]
 		optFiles = getFilesOfOption(optName)
@@ -1789,7 +1828,8 @@ def printOptions(optType):
 
 		# Append column with filenames
 		optRows[i].append(",".join(optFiles))
-
+	
+	optRows.insert(0,["OID","Name","Value","Where applied"])
 	printTable(optRows)
 
 # Prints table
@@ -1829,7 +1869,7 @@ def runCase(caseName):
 	if debug: print('runCase: ',caseName)
 	cid = verifyCase(caseName)
 
-	if not isCmdLineArgument(opts,'--force'):
+	if not isCmdLineArgument(opts,'--force','-f'):
 		print("Use of --force flag is mandatory when running cases")
 		sys.exit(1)
 
@@ -1955,6 +1995,10 @@ if ('--help' in optNames) or ('-h' in optNames):
 	printHelp()
 	sys.exit(0)
 
+if ('--version' in optNames):
+	print("Version "+str(version))
+	sys.exit(0)
+
 if ('--createDB' in optNames):
 	createDB(getCmdLineArgument(opts,'--createDB'))
 	sys.exit(0)
@@ -1988,11 +2032,11 @@ if ('--add' in optNames) or ('-a' in optNames):
 
 	# Add global case option
 	elif (('--option' in optNames) or ('-O' in optNames)) \
-		and (('--value' in optNames) or ('-v' in optNames)) \
+		and (('--value' in optNames) or ('-V' in optNames)) \
 		and (('--file' in optNames) or ('-F' in optNames)):
 		addOption(
 			getCmdLineArgument(opts,'--option','-O'),
-			getCmdLineArgument(opts,'--value','-v'),
+			getCmdLineArgument(opts,'--value','-V'),
 			'case',
 			getCmdLineArgument(opts,'--file','-F')
 			)
@@ -2000,10 +2044,10 @@ if ('--add' in optNames) or ('-a' in optNames):
 	# Add option to case
 	elif (('--option' in optNames) or ('-O' in optNames)) \
 		and (('--case' in optNames) or ('-C' in optNames)) \
-		and (('--value' in optNames) or ('-v' in optNames)):
+		and (('--value' in optNames) or ('-V' in optNames)):
 		addOptionToCase(
 			getCmdLineArgument(opts,'--option','-O'),
-			getCmdLineArgument(opts,'--value','-v'),
+			getCmdLineArgument(opts,'--value','-V'),
 			getCmdLineArgument(opts,'--case','-C')
 			)
 
@@ -2110,11 +2154,11 @@ elif ('--modify' in optNames) or ('-m' in optNames):
 	# Modify option of case
 	if (('--case' in optNames) or ('-C' in optNames)) \
 		and (('--option' in optNames) or ('-O' in optNames)) \
-		and (('--value' in optNames) or ('-v' in optNames)):
+		and (('--value' in optNames) or ('-V' in optNames)):
 		modOptionValueOfCase(
 			getCmdLineArgument(opts,'--case','-C'),
 			getCmdLineArgument(opts,'--option','-O'),
-			getCmdLineArgument(opts,'--value','-v')
+			getCmdLineArgument(opts,'--value','-V')
 			)
 
 	# Modify name of case
@@ -2135,10 +2179,10 @@ elif ('--modify' in optNames) or ('-m' in optNames):
 
 	# Modify value of option
 	elif ('--option' in optNames) or ('-O' in optNames) \
-		and (('--value' in optNames) or ('-v' in optNames)):
+		and (('--value' in optNames) or ('-V' in optNames)):
 		modOptionValue(
 			getCmdLineArgument(opts,'--option','-O'),
-			getCmdLineArgument(opts,'--value','-v')
+			getCmdLineArgument(opts,'--value','-V')
 			)
 
 	# Unspecified
@@ -2174,7 +2218,10 @@ elif ('--print' in optNames) or ('-p' in optNames):
 
 	# Print case and meta options
 	elif ('--options' in optNames):
+		print('Meta options')
 		printOptions('meta')
+		print('')
+		print('Regular options')
 		printOptions('case')
 
 	# Unspecified
@@ -2186,7 +2233,7 @@ elif ('--reset' in optNames):
 	resetTables()
 
 # Builds case in auto mode and runs it afterwards
-elif ('--run' in optNames):
+elif ('--run' in optNames) or ('-r' in optNames):
 	if (('--case' in optNames) or ('-C' in optNames)):
 		runCase(getCmdLineArgument(opts,'--case','-C'))
 

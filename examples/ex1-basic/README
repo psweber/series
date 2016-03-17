@@ -1,0 +1,11 @@
+Example 1 - The Basics
+-----------------------
+
+View the cases that are available:
+$: series --print --cases --withOptions
+
+Build case 'charlie':
+$: series --case charlie --build
+
+When building, the template is copied and renamed
+according to the case's name. The options are applied.
