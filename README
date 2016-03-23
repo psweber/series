@@ -1,6 +1,22 @@
------------------------------------------------
 WARNING: This is an alpha version. Be prepared.
------------------------------------------------
+
+------------------------------------------------------------------------
+Installation
+------------------------------------------------------------------------
+
+In general, no installation is required. Series is a python script that
+is readily interpreted. However, to simplify its usage, do the following
+for a Linux system with bash:
+
+1) Enter the series directory
+2) ln -s series.py series
+3) echo "PATH=$PATH:$PWD" >> ~/.bashrc
+4) Close and re-open your terminal
+
+
+------------------------------------------------------------------------
+Getting Started
+------------------------------------------------------------------------
 
 Create a new data base:
 $: series --createDB SERIESNAME
@@ -9,12 +25,13 @@ Call series without parameters to list often used commands
 $: series
 
 There are four modes: add, delete, modify, print
-Call series with only the mode given to list the related commands
+If you are in a directory that contains a database, call series with
+only the mode given to list the related commands
 $: series --modeX
 
 Check the README files in the example directories
 
-Export the data base to get the command sequence that, if executed
+Export a data base to get the command sequence that, if executed
 in that order, creates a data base with the same content. You can
 use this function to learn how templates, run-files, and cases are
 added and modified. The export function uses the short versions
