@@ -2170,7 +2170,7 @@ elif ('--modify' in optNames) or ('-m' in optNames):
 			)
 
 	# Modify value of option
-	elif ('--option' in optNames) or ('-O' in optNames) \
+	elif (('--option' in optNames) or ('-O' in optNames)) \
 		and ('--name' in optNames):
 		modOptionName(
 			getCmdLineArgument(opts,'--option','-O'),
@@ -2178,7 +2178,7 @@ elif ('--modify' in optNames) or ('-m' in optNames):
 			)
 
 	# Modify value of option
-	elif ('--option' in optNames) or ('-O' in optNames) \
+	elif (('--option' in optNames) or ('-O' in optNames)) \
 		and (('--value' in optNames) or ('-V' in optNames)):
 		modOptionValue(
 			getCmdLineArgument(opts,'--option','-O'),
