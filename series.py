@@ -778,6 +778,15 @@ def delCid(cid,deleteRecursive=True,depth=0):
 	# After recursive call delete current entry
 	sqlCurs.execute('DELETE FROM caseData WHERE cid=?',(cid,))
 
+# Deletes options with default values from case
+def delDefaultOptionsFromCase(caseName):
+	cid = verifyCase(caseName)
+	optNames,optVals,optFiles = buildOptionsForCase(caseName)
+	
+	for optName,optVal in zip(optNames,optVals):
+		if isDefaultValue(optName,optVal):
+			delOptionFromCid(optName,cid,False)
+			
 # Removes file
 def delFile(fileName,force=False):
 	fid = verifyFile(fileName)
@@ -829,12 +838,10 @@ def delOption(optName):
 	# Delete option entry
 	sqlCurs.execute('DELETE FROM options WHERE oid=?',(oid,))
 
-
 # Delete option from a case
 def delOptionFromCase(optName,caseName,addInstance=True):
 	cid = verifyCase(caseName)
 	delOptionFromCid(optName,cid,addInstance)
-
 
 # Delete option from a case with given cid
 def delOptionFromCid(optName,cid,addInstance=True):
@@ -1412,6 +1419,18 @@ def isDB(dbFile,create=False):
 
 	return False
 
+# Returns true if given if value is the default for option optName
+def isDefaultValue(optName,value):
+	defValue = getValueOfOption(optName)
+	
+	if (isNumber(value) and isNumber(defValue) \
+		and (float(value) == float(defValue))):
+		return True
+	elif (value == defValue):
+		return True
+	else:
+		return False
+
 # Returns true if file is a directory
 def isDirectory(fileName):
 	fid = verifyFile(fileName)
@@ -1438,6 +1457,14 @@ def isFile(f):
 			return entry[0]
 
 	return 0
+
+# Returns true if string can be cast as float
+def isNumber(s):
+	try:
+		float(s)
+		return True
+	except ValueError:
+		return False
 
 # Returns true if given argument is valid option id
 def isOid(i,optType='any'):
@@ -1697,7 +1724,11 @@ def printHelpDelete(offset=0):
 	os = '\t' * offset
 
 	print(os+"--option --case")
-	print(os+'\tDeletes option from case (i.e. sets to default)')
+	print(os+'\tDeletes option from case (i.e., sets to default)')
+	print('')
+	
+	print(os+"--default --case")
+	print(os+'\tDeletes options with default values from case')
 	print('')
 
 	print(os+"--file --option")
@@ -2116,30 +2147,36 @@ elif ('--clean' in optNames):
 # Delete something
 elif ('--delete' in optNames) or ('-d' in optNames):
 
-	# Delete option from case
-	if (('--case' in optNames) or ('-C' in optNames)) \
-		and (('--option' in optNames) or ('-O' in optNames)):
-		delOptionFromCase(
-			getCmdLineArgument(opts,'--option','-O'),
-			getCmdLineArgument(opts,'--case','-C')
-			)
-
 	# Delete file from option
-	elif (('--file' in optNames) or ('-F' in optNames)) \
+	if (('--file' in optNames) or ('-F' in optNames)) \
 		and (('--option' in optNames) or ('-O' in optNames)):
 		delFileFromOption(
 			getCmdLineArgument(opts,'--option','-O'),
 			getCmdLineArgument(opts,'--file','-F')
 		)
 
+	# Delete something from case or the case itself
+	elif ('--case' in optNames) or ('-C' in optNames):
+		
+		# Delete options having default values from case
+		if ('--default' in optNames):
+			delDefaultOptionsFromCase(getCmdLineArgument(opts,'--case','-C'))
+				
+		# Delete option from case (i.e., set it to default value)
+		elif ('--option' in optNames) or ('-O' in optNames):
+			delOptionFromCase(
+				getCmdLineArgument(opts,'--option','-O'),
+				getCmdLineArgument(opts,'--case','-C')
+				)
+		
+		# Delete case
+		else:
+			delCase(getCmdLineArgument(opts,'--case','-C'))
+
 	# Delete option
 	elif ('--option' in optNames) or ('-O' in optNames):
 		delOption(getCmdLineArgument(opts,'--option','-O'))
-
-	# Delete case
-	elif ('--case' in optNames) or ('-C' in optNames):
-		delCase(getCmdLineArgument(opts,'--case','-C'))
-
+		
 	# Unspecified
 	else:
 		printHelpDelete()
