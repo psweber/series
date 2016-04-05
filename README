@@ -10,7 +10,7 @@ for a Linux system with bash:
 
 1) Enter the series directory
 2) ln -s series.py series
-3) echo "PATH=$PATH:$PWD" >> ~/.bashrc
+3) echo "PATH=\$PATH:$PWD" >> ~/.bashrc
 4) Close and re-open your terminal
 
 
