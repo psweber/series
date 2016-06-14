@@ -35,7 +35,7 @@ shortOpts = "abdfhimprst:V:C:F:O:T:"
 longOpts = [
 			"add","all","auto","build","case=",
 			"cases","clean","copy=","createDB=","db=",
-			"default","delete","export","help","file=","files",
+			"default","delete","exact","export","help","file=","files",
 			"force","withOptions","interactive",
 			"name=","modify","option=",
 			"options","print","reset","run","runFile=","series",
@@ -311,8 +311,8 @@ def addOptionWithType(optName,optType):
 			print('Not a valid meta option ('+optName+')')
 			sys.exit(1)
 
-		if isCmdLineArgument(opts,'--file','-F'):
-			fileName = getCmdLineArgument(opts,'--file','-F')
+		if isCmdLineArgument('--file','-F'):
+			fileName = getCmdLineArgument('--file','-F')
 		else:
 			fileName = 'none'
 
@@ -326,14 +326,14 @@ def addOptionWithType(optName,optType):
 			sys.exit(1)
 
 		# See if value is given
-		if isCmdLineArgument(opt,'--value','-V'):
-			value = getCmdLineArgument(opt,'--value','-V')
+		if isCmdLineArgument('--value','-V'):
+			value = getCmdLineArgument('--value','-V')
 		else:
 			value = ''
 
 		# See if file is given
-		if isCmdLineArgument(opt,'--file','-F'):
-			fileName = getCmdLineArgument(opt,'--file','-F')
+		if isCmdLineArgument('--file','-F'):
+			fileName = getCmdLineArgument('--file','-F')
 		else:
 			fileName = 'none'
 
@@ -719,7 +719,7 @@ def delBuildCase(caseName,force=False):
 def delCase(caseName,force=False):
 	if debug: print("delCase:",caseName,force)
 
-	if isCmdLineArgument(opts,'--force','-f'):
+	if isCmdLineArgument('--force','-f'):
 		force = True
 
 	cid = verifyCase(caseName)
@@ -982,7 +982,9 @@ def getArgs(shortOpts,longOpts):
 	except getopt.GetoptError:
 		printHelp()
 		sys.exit(1)
-
+	
+	# opts: List of (optName, optValue) pairs
+	# args: List of arguments that could not be matched with an option
 	return opts,args
 
 # Returns cid contained in buildFile
@@ -1025,7 +1027,8 @@ def getCaseName(cid,isCurrentCid=True):
 	return row[0]
 
 # Returns value of given command line option
-def getCmdLineArgument(opts,longOpt,shortOpt="none"):
+def getCmdLineArgument(longOpt,shortOpt="none"):
+	# Use global opts variable
 	for opt,val in opts:
 		if (opt == shortOpt) or (opt == longOpt):
 			return val
@@ -1350,8 +1353,8 @@ def handleExistingCase(cid,caseFile,buildFile):
 		print("Delete case manually.")
 		sys.exit(1)
 
-	auto = isCmdLineArgument(opts,'--auto')
-	force = isCmdLineArgument(opts,'--force','-f')
+	auto = isCmdLineArgument('--auto')
+	force = isCmdLineArgument('--force','-f')
 
 	buildCid = getBuildCid(buildFile)
 	caseName = getCaseName(cid)
@@ -1401,9 +1404,10 @@ def isCid(i,isCurrentCid=False):
 	return False
 
 # Returns true if argument exists
-def isCmdLineArgument(opts,longOpt,shortOpt="none"):
-	for opt,val in opts:
-		if (opt == shortOpt) or (opt == longOpt):
+def isCmdLineArgument(longOpt,shortOpt="none"):
+	# Use global optNames variable
+	for optName in optNames:
+		if (optName == shortOpt) or (optName == longOpt):
 			return True
 
 	return False
@@ -1635,7 +1639,7 @@ def printCases(showDefaults=False):
 			'''):
 		caseNames.append(row[0])
 
-	withOptions = isCmdLineArgument(opts,'--withOptions')
+	withOptions = isCmdLineArgument('--withOptions')
 	for caseName in caseNames:
 		print(caseName)
 		if withOptions:
@@ -1900,7 +1904,7 @@ def runCase(caseName):
 	if debug: print('runCase: ',caseName)
 	cid = verifyCase(caseName)
 
-	if not isCmdLineArgument(opts,'--force','-f'):
+	if not isCmdLineArgument('--force','-f'):
 		print("Use of --force flag is mandatory when running cases")
 		sys.exit(1)
 
@@ -2022,24 +2026,24 @@ if (len(opts) == 0):
 optNames,optVals = zip(*opts)
 sqlCurs = [None]
 
-if ('--help' in optNames) or ('-h' in optNames):
+if isCmdLineArgument('--help','-h'):
 	printHelp()
 	sys.exit(0)
 
-if ('--version' in optNames):
+if isCmdLineArgument('--version'):
 	print("Version "+str(version))
 	sys.exit(0)
 
-if ('--createDB' in optNames):
-	createDB(getCmdLineArgument(opts,'--createDB'))
+if isCmdLineArgument('--createDB'):
+	createDB(getCmdLineArgument('--createDB'))
 	sys.exit(0)
 
 for f in os.listdir("./"):
     if f.endswith(".db"):
         dbFile = f
 
-if isCmdLineArgument(opts,"--db"):
-	dbFile = getCmdLineArgument(opts,"--db")
+if isCmdLineArgument("--db"):
+	dbFile = getCmdLineArgument("--db")
 
 if not os.path.isfile(dbFile):
 	print("Cannot find database.")
@@ -2051,175 +2055,175 @@ else:
 
 
 # Adding something
-if ('--add' in optNames) or ('-a' in optNames):
+if isCmdLineArgument('--add','-a'):
 
 	# Add global option of specified type
-	if (('--option' in optNames) or ('-O' in optNames)) \
-		and (('--type' in optNames) or ('-t' in optNames)):
+	if (isCmdLineArgument('--option','-O')) \
+		and (isCmdLineArgument('--type','-t')):
 		addOptionWithType(
-			getCmdLineArgument(opts,'--option','-O'),
-			getCmdLineArgument(opts,'--type','-t')
+			getCmdLineArgument('--option','-O'),
+			getCmdLineArgument('--type','-t')
 			)
 
 	# Add global case option
-	elif (('--option' in optNames) or ('-O' in optNames)) \
-		and (('--value' in optNames) or ('-V' in optNames)) \
-		and (('--file' in optNames) or ('-F' in optNames)):
+	elif (isCmdLineArgument('--option','-O')) \
+		and (isCmdLineArgument('--value','-V')) \
+		and (isCmdLineArgument('--file','-F')):
 		addOption(
-			getCmdLineArgument(opts,'--option','-O'),
-			getCmdLineArgument(opts,'--value','-V'),
+			getCmdLineArgument('--option','-O'),
+			getCmdLineArgument('--value','-V'),
 			'case',
-			getCmdLineArgument(opts,'--file','-F')
+			getCmdLineArgument('--file','-F')
 			)
 
 	# Add option to case
-	elif (('--option' in optNames) or ('-O' in optNames)) \
-		and (('--case' in optNames) or ('-C' in optNames)) \
-		and (('--value' in optNames) or ('-V' in optNames)):
+	elif (isCmdLineArgument('--option','-O')) \
+		and (isCmdLineArgument('--case','-C')) \
+		and (isCmdLineArgument('--value','-V')):
 		addOptionToCase(
-			getCmdLineArgument(opts,'--option','-O'),
-			getCmdLineArgument(opts,'--value','-V'),
-			getCmdLineArgument(opts,'--case','-C')
+			getCmdLineArgument('--option','-O'),
+			getCmdLineArgument('--value','-V'),
+			getCmdLineArgument('--case','-C')
 			)
 
 	# Add file to global option
-	elif (('--file' in optNames) or ('-F' in optNames)) \
-		and (('--option' in optNames) or ('-O' in optNames)):
+	elif (isCmdLineArgument('--file','-F')) \
+		and (isCmdLineArgument('--option','-O')):
 		addFileToOption(
-			getCmdLineArgument(opts,'--file','-F'),
-			getCmdLineArgument(opts,'--option','-O')
+			getCmdLineArgument('--file','-F'),
+			getCmdLineArgument('--option','-O')
 			)
 
 	# Add case by menu
-	elif (('--case' in optNames) or ('-C' in optNames)) \
-		and ('--interactive' in optNames) or ('-i' in optNames):
-		addCaseByMenu(getCmdLineArgument(opts,'--case','-C'))
+	elif (isCmdLineArgument('--case','-C')) \
+		and isCmdLineArgument('--interactive','-i'):
+		addCaseByMenu(getCmdLineArgument('--case','-C'))
 
 	# Add case by copy
-	elif (('--case' in optNames) or ('-C' in optNames)) \
-		and ('--copy') in optNames:
+	elif (isCmdLineArgument('--case','-C')) \
+		and isCmdLineArgument('--copy'):
 		addCaseByCopy(
-			getCmdLineArgument(opts,'--case','-C'),
-			getCmdLineArgument(opts,'--copy'),
+			getCmdLineArgument('--case','-C'),
+			getCmdLineArgument('--copy'),
 			)
 
 	# Add default case
-	elif ('--case' in optNames) or ('-C' in optNames):
-		addCase(getCmdLineArgument(opts,'--case','-C'))
+	elif isCmdLineArgument('--case','-C'):
+		addCase(getCmdLineArgument('--case','-C'))
 
 	# File
-	elif ('--file' in optNames) or ('-F' in optNames):
-		addFile(getCmdLineArgument(opts,'--file','-F'))
+	elif isCmdLineArgument('--file','-F'):
+		addFile(getCmdLineArgument('--file','-F'))
 
 	# Template
-	elif ('--template' in optNames) or ('-T' in optNames):
-		addTemplate(getCmdLineArgument(opts,'--template','-T'))
+	elif isCmdLineArgument('--template','-T'):
+		addTemplate(getCmdLineArgument('--template','-T'))
 
 	# Runfile
-	elif ('--runFile' in optNames):
-		addRunFile(getCmdLineArgument(opts,'--runFile'))
+	elif isCmdLineArgument('--runFile'):
+		addRunFile(getCmdLineArgument('--runFile'))
 
 	# Unspecified
 	else:
 		printHelpAdd()
 
 # Build case
-elif ('--build' in optNames) or ('-b' in optNames):
+elif isCmdLineArgument('--build','-b'):
 
-	if ('--case' in optNames) or ('-C' in optNames):
-		buildCase(getCmdLineArgument(opts,'--case','-C'))
+	if isCmdLineArgument('--case','-C'):
+		buildCase(getCmdLineArgument('--case','-C'))
 
 	else:
 		print('Missing case')
 
 # Clean builds
-elif ('--clean' in optNames):
+elif isCmdLineArgument('--clean'):
 
 	# Removes build files without questioning
-	if (('--case' in optNames) or ('-C' in optNames)) \
-		and (('--force' in optNames) or ('-f' in optNames)):
-		delBuildCase(getCmdLineArgument(opts,'--case','-C'),True)
+	if (isCmdLineArgument('--case','-C')) \
+		and (isCmdLineArgument('--force','-f')):
+		delBuildCase(getCmdLineArgument('--case','-C'),True)
 
 	# Removes build files
-	elif (('--case' in optNames) or ('-C' in optNames)):
-		delBuildCase(getCmdLineArgument(opts,'--case','-C'))
+	elif (isCmdLineArgument('--case','-C')):
+		delBuildCase(getCmdLineArgument('--case','-C'))
 
 # Delete something
-elif ('--delete' in optNames) or ('-d' in optNames):
+elif isCmdLineArgument('--delete','-d'):
 
 	# Delete file from option
-	if (('--file' in optNames) or ('-F' in optNames)) \
-		and (('--option' in optNames) or ('-O' in optNames)):
+	if (isCmdLineArgument('--file','-F')) \
+		and (isCmdLineArgument('--option','-O')):
 		delFileFromOption(
-			getCmdLineArgument(opts,'--option','-O'),
-			getCmdLineArgument(opts,'--file','-F')
+			getCmdLineArgument('--option','-O'),
+			getCmdLineArgument('--file','-F')
 		)
 
 	# Delete something from case or the case itself
-	elif ('--case' in optNames) or ('-C' in optNames):
+	elif isCmdLineArgument('--case','-C'):
 		
 		# Delete options having default values from case
-		if ('--default' in optNames):
-			delDefaultOptionsFromCase(getCmdLineArgument(opts,'--case','-C'))
+		if isCmdLineArgument('--default'):
+			delDefaultOptionsFromCase(getCmdLineArgument('--case','-C'))
 				
 		# Delete option from case (i.e., set it to default value)
-		elif ('--option' in optNames) or ('-O' in optNames):
+		elif isCmdLineArgument('--option','-O'):
 			delOptionFromCase(
-				getCmdLineArgument(opts,'--option','-O'),
-				getCmdLineArgument(opts,'--case','-C')
+				getCmdLineArgument('--option','-O'),
+				getCmdLineArgument('--case','-C')
 				)
 		
 		# Delete case
 		else:
-			delCase(getCmdLineArgument(opts,'--case','-C'))
+			delCase(getCmdLineArgument('--case','-C'))
 
 	# Delete option
-	elif ('--option' in optNames) or ('-O' in optNames):
-		delOption(getCmdLineArgument(opts,'--option','-O'))
+	elif isCmdLineArgument('--option','-O'):
+		delOption(getCmdLineArgument('--option','-O'))
 		
 	# Unspecified
 	else:
 		printHelpDelete()
 
 # Export
-elif ('--export' in optNames):
+elif isCmdLineArgument('--export'):
 	export()
 
 # Modify something
-elif ('--modify' in optNames) or ('-m' in optNames):
+elif isCmdLineArgument('--modify','-m'):
 
 	# Modify option of case
-	if (('--case' in optNames) or ('-C' in optNames)) \
-		and (('--option' in optNames) or ('-O' in optNames)) \
-		and (('--value' in optNames) or ('-V' in optNames)):
+	if (isCmdLineArgument('--case','-C')) \
+		and (isCmdLineArgument('--option','-O')) \
+		and (isCmdLineArgument('--value','-V')):
 		modOptionValueOfCase(
-			getCmdLineArgument(opts,'--case','-C'),
-			getCmdLineArgument(opts,'--option','-O'),
-			getCmdLineArgument(opts,'--value','-V')
+			getCmdLineArgument('--case','-C'),
+			getCmdLineArgument('--option','-O'),
+			getCmdLineArgument('--value','-V')
 			)
 
 	# Modify name of case
-	elif (('--case' in optNames) or ('-C' in optNames)) and \
-		('--name' in optNames):
+	elif (isCmdLineArgument('--case','-C')) and \
+		isCmdLineArgument('--name'):
 		modCaseName(
-			getCmdLineArgument(opts,'--case','-C'),
-			getCmdLineArgument(opts,'--name')
+			getCmdLineArgument('--case','-C'),
+			getCmdLineArgument('--name')
 			)
 
 	# Modify value of option
-	elif (('--option' in optNames) or ('-O' in optNames)) \
-		and ('--name' in optNames):
+	elif (isCmdLineArgument('--option','-O')) \
+		and isCmdLineArgument('--name'):
 		modOptionName(
-			getCmdLineArgument(opts,'--option','-O'),
-			getCmdLineArgument(opts,'--name')
+			getCmdLineArgument('--option','-O'),
+			getCmdLineArgument('--name')
 			)
 
 	# Modify value of option
-	elif (('--option' in optNames) or ('-O' in optNames)) \
-		and (('--value' in optNames) or ('-V' in optNames)):
+	elif (isCmdLineArgument('--option','-O')) \
+		and (isCmdLineArgument('--value','-V')):
 		modOptionValue(
-			getCmdLineArgument(opts,'--option','-O'),
-			getCmdLineArgument(opts,'--value','-V')
+			getCmdLineArgument('--option','-O'),
+			getCmdLineArgument('--value','-V')
 			)
 
 	# Unspecified
@@ -2227,34 +2231,34 @@ elif ('--modify' in optNames) or ('-m' in optNames):
 		printHelpModify()
 
 # Print something
-elif ('--print' in optNames) or ('-p' in optNames):
+elif isCmdLineArgument('--print','-p'):
 
 	# Case including default options
-	if (('--case' in optNames) or ('-C' in optNames)) \
-		and ('--default' in optNames):
-		printCaseOptions(getCmdLineArgument(opts,'--case','-C'),True)
+	if (isCmdLineArgument('--case','-C')) \
+		and isCmdLineArgument('--default'):
+		printCaseOptions(getCmdLineArgument('--case','-C'),True)
 
 	# Cases
-	elif (('--case' in optNames) or ('-C' in optNames)):
-		printCaseOptions(getCmdLineArgument(opts,'--case','-C'))
+	elif (isCmdLineArgument('--case','-C')):
+		printCaseOptions(getCmdLineArgument('--case','-C'))
 
 	# Cases including default options
-	elif ('--cases' in optNames) and ('--default' in optNames):
+	elif isCmdLineArgument('--cases') and isCmdLineArgument('--default'):
 		printCases(True)
 
 	# Cases
-	elif ('--cases' in optNames): printCases()
+	elif isCmdLineArgument('--cases'): printCases()
 
 	# All files
-	elif ('--files' in optNames): printFiles()
+	elif isCmdLineArgument('--files'): printFiles()
 
 	# Print series options
-	elif ('--options' in optNames) \
-	and (('--series' in optNames) or ('-s' in optNames)):
+	elif isCmdLineArgument('--options') \
+	and isCmdLineArgument('--series','-s'):
 		printOptions('series')
 
 	# Print case and meta options
-	elif ('--options' in optNames):
+	elif isCmdLineArgument('--options'):
 		print('Meta options')
 		printOptions('meta')
 		print('')
@@ -2266,13 +2270,13 @@ elif ('--print' in optNames) or ('-p' in optNames):
 		printHelpPrint()
 
 # Reset DB to initial state
-elif ('--reset' in optNames):
+elif isCmdLineArgument('--reset'):
 	resetTables()
 
 # Builds case in auto mode and runs it afterwards
-elif ('--run' in optNames) or ('-r' in optNames):
-	if (('--case' in optNames) or ('-C' in optNames)):
-		runCase(getCmdLineArgument(opts,'--case','-C'))
+elif isCmdLineArgument('--run','-r'):
+	if (isCmdLineArgument('--case','-C')):
+		runCase(getCmdLineArgument('--case','-C'))
 
 # Sets runfile
 
