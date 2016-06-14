@@ -165,6 +165,23 @@ def addCaseData(fatherCid=0):
 
 	return newCid
 
+# Adds case according to command line parameters
+def addCmdCase(caseName):
+	# Add by menu
+	if isCmdLineArgument('--interactive','-i'):
+		addCaseByMenu(caseName)
+		
+	# Add by copy
+	elif isCmdLineArgument('--copy'):
+		addCaseByCopy(
+			caseName,
+			getCmdLineArgument('--copy'),
+			)
+	
+	# Add default case
+	else:
+		addCase(caseName)
+			
 # Adds a file to file table and returns its fid
 def addFile(newFile):
 	if debug: print("addFile: ",newFile)
@@ -288,7 +305,7 @@ def addOptionToCid(optName,optValue,cid,addInstance=True):
 	if addInstance:
 		caseName = getCaseName(cid)
 		newCid = addCaseData(cid)
-		updateCurrentCid(caseName,newCid)
+		updateCurrentCid(cid,newCid)
 		insert = (oidString,valString,newCid)
 
 	# Retain current id
@@ -381,13 +398,11 @@ def addTemplate(tmplFile):
 	addFileToOption(tmplFile,'templateFiles')
 
 # Sets options defined for case for given file
-def applyOptionsToFile(caseName,fileName):
-	if debug: print("applyOptionsToFile:",caseName,fileName)
-	cid = verifyCase(caseName)
-	fid = verifyFile(fileName)
+def applyOptionsToFile(cid,fileName):
+	if debug: print("applyOptionsToFile:",cid,fileName)
 
 	# Build fully qualified name of file
-	FQFN = buildFQFN(caseName,fileName)
+	FQFN = buildFQFN(cid,fileName)
 
 	# Find out which options are to set here
 	usedOpts = getOptionsUsedInFile(fileName)
@@ -407,7 +422,7 @@ def applyOptionsToFile(caseName,fileName):
 		for line in initial:
 
 			# For every option check if it is used in current line
-			adaptedLine,optsInLine = applyOptionsToString(caseName,usedOpts,line)
+			adaptedLine,optsInLine = applyOptionsToString(cid,usedOpts,line)
 
 			# After every option in this line was handled, write line
 			f.write(adaptedLine)
@@ -428,7 +443,7 @@ def applyOptionsToFile(caseName,fileName):
 
 # Returns a string where all options occuring in input string are
 # replaced by their values, as well as a list of options applied
-def applyOptionsToString(caseName,optsUsedInFile,inputString):
+def applyOptionsToString(cid,optsUsedInFile,inputString):
 	adaptedString = inputString
 	appliedOpts = []
 
@@ -440,9 +455,9 @@ def applyOptionsToString(caseName,optsUsedInFile,inputString):
 
 			# Replace option string by its value
 			if isOption(opt,'meta'):
-				value = getValueOfMetaOption(opt,caseName)
+				value = getValueOfMetaOptionOfCid(opt,cid)
 			else:
-				value = getValueOfOptionOfCase(opt,caseName)
+				value = getValueOfOptionOfCid(opt,cid)
 			adaptedString = adaptedString.replace(optStr,value)
 
 			# Keep track which options you found in this file
@@ -450,45 +465,47 @@ def applyOptionsToString(caseName,optsUsedInFile,inputString):
 				appliedOpts.append(opt)
 
 	# Treat caseName as special option
-	adaptedString = adaptedString.replace('OPT_CASENAME','OPT_'+caseName.upper())
+	#caseName = getCaseName(cid)
+	#adaptedString = adaptedString.replace('OPT_CASENAME','OPT_'+caseName.upper())
 
 	return adaptedString,appliedOpts
 
 # Makes copy of template and applies options
-def buildCase(caseName):
-	if debug: print("buildCase:",caseName)
-	cid = verifyCase(caseName)
-
+def buildCid(cid):
+	if debug: print("buildCid:",cid)
+	
+	# Get case name (verifies cid)
+	caseName = getCaseName(cid)
+	
 	# Copy template files
-	buildCaseTree(caseName)
+	buildCaseTree(cid)
 
 	# Get files where options are to be applied
 	# File names are not case adapted yet
 	optionFiles = getFiles()
-	if debug: print("buildCase: optionFiles, ",optionFiles)
+	if debug: print("buildCid: optionFiles, ",optionFiles)
 
 	# Go through all files and gather options to set in that file
 	for fileName in optionFiles:
-		applyOptionsToFile(caseName,fileName)
+		applyOptionsToFile(cid,fileName)
 
 	# Update case entry for last build
 	updateCaseBuildData(caseName)
 
 # Creates case tree by copying templates
-def buildCaseTree(caseName):
-	if debug: print("buildCaseTree:",caseName)
-	cid = verifyCase(caseName)
-
+def buildCaseTree(cid):
+	if debug: print("buildCaseTree:",cid)
+	
 	tmplFiles = getFilesOfOption('templateFiles')
 
 	# Create case files from template files, preserving symlinks
 	for tFile in tmplFiles:
-		cFile = buildFQFN(caseName,tFile)
+		cFile = buildFQFN(cid,tFile)
 		bFile = getBuildFile(cFile,tFile)
 
 		# If file is already present
 		if os.path.exists(cFile):
-			handleExistingCase(cid,cFile,bFile)
+			handleTreeBuildingForExistingCase(cid,cFile,bFile)
 
 		# Copy template data to create new case
 		if os.path.isdir(tFile):
@@ -501,13 +518,13 @@ def buildCaseTree(caseName):
 		with open(bFile,'w') as f:
 			f.write(str(cid))
 
-# Assembles fully qualified file name of file for given case name,
+# Assembles fully qualified file name of file for given cid,
 # i.e. the relative path regarding the script execution directory
-def buildFQFN(caseName,fileName):
-	if debug: print("buildFQFN:",caseName,fileName)
-	fid = verifyFile(fileName)
+def buildFQFN(cid,fileName):
+	if debug: print("buildFQFN:",cid,fileName)
 
 	# Find out template fid
+	fid = verifyFile(fileName)
 	sqlCurs.execute('SELECT templateFid FROM files WHERE fid=?',(fid,))
 	row = sqlCurs.fetchone()
 	tmplFid = row[0]
@@ -524,6 +541,7 @@ def buildFQFN(caseName,fileName):
 	# Replace template strings by full case name
 	tmplString = getValueOfOption('templateString')
 	seriesName = getValueOfOption('seriesName')
+	caseName = getCaseName(cid)
 	fullCaseName = seriesName + '-' + caseName
 
 	return FQFN.replace(tmplString,fullCaseName)
@@ -532,7 +550,11 @@ def buildFQFN(caseName,fileName):
 # If includeDefaults=True also options with default values are returned
 def buildOptionsForCase(caseName,includeDefaults=False):
 	cid = verifyCase(caseName)
-
+	return buildOptionsForCid(cid,includeDefaults)
+	
+# Returns options, their values and files for given cid
+# If includeDefaults=True also options with default values are returned
+def buildOptionsForCid(cid,includeDefaults=False):
 	optNames = []
 	optVals = []
 	optFiles = []
@@ -549,8 +571,8 @@ def buildOptionsForCase(caseName,includeDefaults=False):
 	# Get values and files for all options
 	toPop = []
 	for opt in optNames:
-		if includeDefaults or isOptionSetForCase(opt,caseName):
-			optVals.append(getValueOfOptionOfCase(opt,caseName))
+		if includeDefaults or isOptionSetForCid(opt,cid):
+			optVals.append(getValueOfOptionOfCid(opt,cid))
 			optFiles.append(getFilesOfOption(opt))
 		else:
 			idx = optNames.index(opt)
@@ -687,12 +709,11 @@ def createTables():
 			''')
 
 # Deletes all files created during build of given case
-def delBuildCase(caseName,force=False):
-	if debug: print("delBuildCase:",caseName)
-	cid = verifyCase(caseName)
+def delBuildCase(cid,force=False):
+	if debug: print("delBuildCase:",cid)
 
 	if not force:
-		print("Warning: You are about to delete build of case "+caseName+"!")
+		print("Warning: You are about to delete the build case!")
 		answer = raw_input("Proceed? (Y/n): ")
 		if (answer != 'Y'):
 			print("Abort.")
@@ -701,7 +722,7 @@ def delBuildCase(caseName,force=False):
 	tmplFiles = getFilesOfOption('templateFiles')
 
 	for tFile in tmplFiles:
-		cFile = buildFQFN(caseName,tFile)
+		cFile = buildFQFN(cid,tFile)
 		bFile = getBuildFile(cFile,tFile)
 		
 		if os.path.isdir(cFile):
@@ -709,8 +730,7 @@ def delBuildCase(caseName,force=False):
 		elif os.path.isfile(cFile):
 			os.remove(cFile)
 		else:
-			print('WARNING, file could not be deleted.')
-			print('May be due to mixed upper/lower case')
+			print('Nothing to delete.')
 
 		if os.path.isfile(bFile):
 			os.remove(bFile)
@@ -781,12 +801,16 @@ def delCid(cid,deleteRecursive=True,depth=0):
 # Deletes options with default values from case
 def delDefaultOptionsFromCase(caseName):
 	cid = verifyCase(caseName)
-	optNames,optVals,optFiles = buildOptionsForCase(caseName)
+	delDefaultOptionsFromCid(cid)
+			
+# Deletes options with default values from cid
+def delDefaultOptionsFromCid(cid):
+	optNames,optVals,optFiles = buildOptionsForCid(cid)
 	
 	for optName,optVal in zip(optNames,optVals):
 		if isDefaultValue(optName,optVal):
 			delOptionFromCid(optName,cid,False)
-			
+
 # Removes file
 def delFile(fileName,force=False):
 	fid = verifyFile(fileName)
@@ -871,7 +895,7 @@ def delOptionFromCid(optName,cid,addInstance=True):
 	if addInstance:
 		newCid = addCaseData(cid)
 		caseName = getCaseName(cid)
-		updateCurrentCid(caseName,newCid)
+		updateCurrentCid(cid,newCid)
 		insert = (oidString,valString,newCid)
 	else:
 		insert = (oidString,valString,cid)
@@ -1122,6 +1146,19 @@ def getFilesOfOption(optName):
 
 	return files
 
+# Returns list of cids with matching caseNames
+def getMatchingCids(caseName):
+	cids = []
+	
+	insert = ("%"+caseName.upper()+"%",)
+	for c in sqlCurs.execute(
+			'SELECT currentCid FROM cases \
+			WHERE UPPER(caseName) LIKE ?',
+			insert):
+		cids.append(c[0])
+	
+	return cids
+
 # Returns a list of options of given type
 def getOptions(optTypes='any'):
 	verifyOptionType(optTypes)
@@ -1153,20 +1190,17 @@ def getPartriarchCid(cid):
 	return cid
 
 # Returns name of run file and directory where it is located
-def  getRunFileAndDir(caseName,runFid):
-	if debug: print('getRunFileAndDir: ',caseName,runFid)
-
-	cid = verifyCase(caseName)
-	verifyFid(runFid)
+def  getRunFileAndDir(cid,runFid):
+	if debug: print('getRunFileAndDir: ',cid,runFid)
 
 	if not runFid:
-		print("No run file defined for case "+caseName)
+		print("No run file defined")
 		sys.exit(1)
 
 	# Get name of runfile and templateFid
 	runFileName = getFileName(runFid)
 	templateName = getTemplateName(runFileName)
-	FQRFN = buildFQFN(caseName,runFileName)
+	FQRFN = buildFQFN(cid,runFileName)
 	if debug: print('getRunFileAndDir: ',FQRFN)
 
 	# Runfile is also template file
@@ -1277,11 +1311,17 @@ def getTimeBuild(cid):
 	return row[0]
 
 # Returns value of meta option
-def getValueOfMetaOption(optName,caseName):
+def getValueOfMetaOptionOfCase(optName,caseName):
+	cid = verifyCase(caseName)
+	return getValueOfMetaOptionOfCid(optName,cid)
+
+# Returns value of meta option
+def getValueOfMetaOptionOfCid(optName,cid):
 	verifyOption(optName,'meta')
+	verifyCid(cid)
 
 	if (optName == '_caseName'):
-		return caseName
+		return getCaseName(cid)
 
 	if (optName == '_seriesName'):
 		return getValueOfOption('seriesName')
@@ -1292,7 +1332,7 @@ def getValueOfOption(optName):
 	oid = verifyOption(optName)
 
 	if isOption(optName,'meta'):
-		print("Cannot handle meta options. Call getValueOfMetaOption instead.")
+		print("Cannot handle meta options. Call getValueOfMetaOptionOf... instead.")
 		sys.exit(1)
 
 	else:
@@ -1303,15 +1343,13 @@ def getValueOfOption(optName):
 # Returns value of given option for specific case
 def getValueOfOptionOfCase(optionName,caseName):
 	cid = isCase(caseName)
-	if not cid:
-		print('Not a valid case ('+caseName+')')
-		sys.exit(1)
-
+	return getValueOfOptionOfCid(optionName,cid);
+		
+# Returns value of given option for specific cid
+def getValueOfOptionOfCid(optionName,cid):
+	cid = verifyCid(cid)
 	oid = isOption(optionName)
-	if not oid:
-		print('Not a valid option ('+optionName+')')
-		sys.exit(1)
-
+	
 	# Look at first if option has non-default value for case
 	sqlCurs.execute('SELECT oidString,valueString FROM caseData WHERE cid=?',(cid,))
 	row = sqlCurs.fetchone()
@@ -1321,14 +1359,14 @@ def getValueOfOptionOfCase(optionName,caseName):
 		caseOids = map(int,caseOids)
 		caseVals = row[1].split(',')
 		caseVals = [ v.replace("_;_",",") for v in caseVals ]
-
+		
 		if oid in caseOids:
 			idx = caseOids.index(oid)
 			return caseVals[idx]
 
 	# Option not set for this case, return default value
 	if optionName in metaOptions:
-		return getValueOfMetaOption(optionName,caseName)
+		return getValueOfMetaOptionOfCid(optionName,cid)
 	else:
 		return getValueOfOption(optionName)
 
@@ -1342,9 +1380,159 @@ def getYoungCid(cid):
 	else:
 		return cid
 
-# Handles existing case file
-def handleExistingCase(cid,caseFile,buildFile):
-	if debug: print("handleExistingCase:",cid,caseFile,buildFile)
+# Takes caseName and processes it according to command line arguments,
+# might result in execution of multiple cases
+def handleCmdCase(caseName):
+	if debug: print("handleCmdCase: ",caseName)
+	
+	# Add case
+	if isCmdLineArgument('--add','-a') \
+		and not isCmdLineArgument('--option','-O'):
+		addCmdCase(caseName)
+	
+	# Its not adding, so process
+	else:
+		cid = isCase(caseName)
+		
+		# Case with exact case name exists
+		if (cid != 0):
+			handleCidSingle(cid)
+		
+		# Look for cases containing caseName as substring
+		else:
+			cids = getMatchingCids(caseName)
+			
+			if (len(cids) == 0):
+				print("No matching case ("+caseName+")")
+				sys.exit(1)
+			
+			elif (len(cids) == 1):
+				print("Did not find "+caseName+", taking "+getCaseName(cids[0]))
+				handleCidSingle(cids[0])
+			
+			else:
+				handleCidMulti(cids)
+
+# Process single case according to command line arguments
+def handleCidSingle(cid):
+	if debug: print("handleCidSingle: ",cid)
+	
+	# Add something
+	if isCmdLineArgument('--add','-a'):
+		
+		# Add option to cid
+		if isCmdLineArgument('--option','-O') \
+			and isCmdLineArgument('--value','-V'):
+			addOptionToCid(
+				getCmdLineArgument('--option','-O'),
+				getCmdLineArgument('--value','-V'),
+				cid
+				)
+		
+		# Arguments invalid, print help
+		else:
+			printHelpAdd()
+			sys.exit(1)
+	
+	# Build case
+	elif isCmdLineArgument('--build','-b'):
+		buildCid(cid)
+	
+	# Clean builds
+	elif isCmdLineArgument('--clean'):
+
+		# Removes build files without questioning
+		if isCmdLineArgument('--force','-f'):
+			delBuildCase(cid,True)
+
+		# Removes build files
+		else:
+			delBuildCase(cid)
+	
+	# Delete something from case or the case itself
+	elif isCmdLineArgument('--delete','-d'):
+		
+		# Delete options having default values from case
+		if isCmdLineArgument('--default'):
+			delDefaultOptionsFromCid(cid)
+				
+		# Delete option from case (i.e., set it to default value)
+		elif isCmdLineArgument('--option','-O'):
+			delOptionFromCid(
+				getCmdLineArgument('--option','-O'),
+				cid
+				)
+		
+		# Delete case
+		else:
+			# Use caseName, delCid is part of recursive deletion procedure
+			caseName = getCaseName(cid)
+			delCase(caseName)
+
+	# Modify case
+	elif isCmdLineArgument('--modify','-m'):
+		
+		# Modify option of case
+		if isCmdLineArgument('--option','-O') \
+			and isCmdLineArgument('--value','-V'):
+			modOptionValueOfCid(
+				cid,
+				getCmdLineArgument('--option','-O'),
+				getCmdLineArgument('--value','-V')
+				)
+
+		# Modify name of case
+		elif isCmdLineArgument('--name'):
+			modNameOfCid(
+				cid,
+				getCmdLineArgument('--name')
+				)
+		
+		# Arguments invalid, print help
+		else:
+			printHelpModify()
+			sys.exit(1)
+	
+	# Print case
+	elif isCmdLineArgument('--print','-p'):
+		
+		# Case including default options
+		if isCmdLineArgument('--default'):
+			printCidOptions(cid,True)
+
+		# Case with only non-default options
+		else:
+			printCidOptions(cid)
+	
+	# Builds case in auto mode and runs it afterwards
+	elif isCmdLineArgument('--run','-r'):
+		runCid(cid)
+	
+	# Arguments invalid, print help
+	else:
+		printHelp()
+		sys.exit(1)
+
+# Process all given cids according to command line arguments
+def handleCidMulti(cids):
+	print("Found multiple ("+str(len(cids))+") matching cases:")
+	for cid in cids:
+		caseName = getCaseName(cid)
+		print("  "+caseName)
+	
+	answer = raw_input("Proceed? (Y/n): ")
+	if (answer != 'Y'):
+		print("Abort.")
+		sys.exit(0)
+	
+	for cid in cids:
+		caseName = getCaseName(cid)
+		print("Processing "+caseName)
+		handleCidSingle(cid)
+
+# Called if a case tree is to be build and the case (directory/file) already exists
+def handleTreeBuildingForExistingCase(cid,caseFile,buildFile):
+	if debug: print("handleTreeBuildingForExistingCase:",cid,caseFile,buildFile)
 	if not os.path.exists(caseFile):
 		return
 
@@ -1375,24 +1563,24 @@ def handleExistingCase(cid,caseFile,buildFile):
 			printBuildInfo(cid,buildCid)
 
 	# Go ahead and delete
-	delBuildCase(caseName,force)
+	delBuildCase(cid,force)
 
 # Returns case id if given argument is valid case, 0 otherwise
-def isCase(isC):
-	if (len(str(isC)) == 0):
+def isCase(caseName):
+	if (len(str(caseName)) == 0):
 		return 0
 
 	for c in sqlCurs.execute('SELECT caseName,currentCid FROM cases'):
-		if isC.lower() == c[0].lower():
+		if caseName.lower() == c[0].lower():
 			return c[1]
 
 	return 0
 
 # Returns true if given argument is valid case id
-def isCid(i,isCurrentCid=False):
+def isCid(i,hasToBeCurrentCid=False):
 	i = int(i)
 
-	if isCurrentCid:
+	if hasToBeCurrentCid:
 		for row in sqlCurs.execute('SELECT currentCid FROM cases'):
 			if (i == row[0]):
 				return True
@@ -1537,10 +1725,14 @@ def isOptionUsedInFile(optName,fileName):
 	else:
 		return False
 
-# Changes the name of case
-def modCaseName(caseName,newName):
-	addCaseByCopy(newName,caseName)
-	delCase(caseName,True)
+# Changes the name of cid
+def modNameOfCid(cid,newName):
+	if (isCase(newName) > 0):
+		print("Name already in use ("+newName+")")
+		sys.exit(1)
+	
+	insert = (newName,cid)
+	sqlCurs.execute('UPDATE cases SET caseName=? WHERE cid=?',insert)
 
 # Changes the name of option
 def modOptionName(optName,newName):
@@ -1587,14 +1779,20 @@ def modOptionValue(optName,optValNew):
 # Changes value of option for given case
 def modOptionValueOfCase(caseName,optName,optValue):
 	if debug: print("modOptionValueOfCase: ",caseName,optName,optValue)
-	cid = verifyCase(caseName)
-	oid = verifyOption(optName)
+	cid = isCase(caseName)
+	modOptionValueOfCid(cid,optName,optValue)
+
+# Changes value of option for given cid
+def modOptionValueOfCid(cid,optName,optValue):
+	if debug: print("modOptionValueOfCid: ",cid,optName,optValue)
 	
-	# If option is not present yet, simply add and return
-	if not isOptionSetForCase(optName,caseName):
-		addOptionToCase(optName,optValue,caseName)
+	# If option is not present yet, add it and return
+	if not isOptionSetForCid(optName,cid):
+		addOptionToCid(optName,optValue,cid)
 		return
 
+	cid = verifyCid(cid)
+	
 	# Get current option and value string from case
 	sqlCurs.execute('SELECT oidString,valueString FROM caseData WHERE cid=?',(cid,))
 	row = sqlCurs.fetchone()
@@ -1613,7 +1811,7 @@ def modOptionValueOfCase(caseName,optName,optValue):
 
 	# Update DB
 	newCid = addCaseData(cid)
-	updateCurrentCid(caseName,newCid)
+	updateCurrentCid(cid,newCid)
 	insert = (oidString,valString,newCid)
 	sqlCurs.execute('UPDATE caseData SET oidString=?,valueString=? WHERE cid=?',insert)
 
@@ -1647,7 +1845,12 @@ def printCases(showDefaults=False):
 
 # Prints given case
 def printCaseOptions(caseName,showDefaults=False):
-	opts,vals,files = buildOptionsForCase(caseName,showDefaults)
+	cid = isCase(caseName)
+	printCidOptions(cid,showDefaults)
+	
+# Prints given cid
+def printCidOptions(cid,showDefaults=False):
+	opts,vals,files = buildOptionsForCid(cid,showDefaults)
 
 	table = []
 	for i in range(len(opts)):
@@ -1902,18 +2105,24 @@ def resetTables():
 # Builds case in auto mode, runs it afterwards
 def runCase(caseName):
 	if debug: print('runCase: ',caseName)
-	cid = verifyCase(caseName)
+	cid = isCase(caseName)
+	runCid(cid)
 
+
+# Builds case in auto mode, runs it afterwards
+def runCid(cid):
+	if debug: print('runCid: ',cid)
+	
 	if not isCmdLineArgument('--force','-f'):
 		print("Use of --force flag is mandatory when running cases")
 		sys.exit(1)
 
-	buildCase(caseName)
+	buildCid(cid)
 
 	oid = isOption('runFiles')
 	runFids = getFidsOfOid(oid)
 	for runFid in runFids:
-		runFile,runDir = getRunFileAndDir(caseName,runFid)
+		runFile,runDir = getRunFileAndDir(cid,runFid)
 		if debug: print('runCase: runFile,runDir ',runFile,runDir)
 		os.chdir(runDir)
 		if debug: print('runCase: running ',runFile)
@@ -1932,9 +2141,8 @@ def updateCaseBuildData(caseName):
 		WHERE cid=?''',insert)
 
 # Updates currend cid of case entry in table cases
-def updateCurrentCid(caseName,newCid):
-	verifyCase(caseName)
-	verifyCid(newCid)
+def updateCurrentCid(oldCid,newCid):
+	caseName = getCaseName(oldCid)
 
 	insert = (newCid,caseName)
 	sqlCurs.execute('''
@@ -2053,9 +2261,14 @@ else:
 	sqlCurs = sqlCon.cursor()
 
 
+# Do everything related to a specific case
+if isCmdLineArgument('--case','-C'):
+	handleCmdCase(getCmdLineArgument('--case','-C'));
 
+
+# Anything else that is not related to a specific case
 # Adding something
-if isCmdLineArgument('--add','-a'):
+elif isCmdLineArgument('--add','-a'):
 
 	# Add global option of specified type
 	if (isCmdLineArgument('--option','-O')) \
@@ -2065,7 +2278,7 @@ if isCmdLineArgument('--add','-a'):
 			getCmdLineArgument('--type','-t')
 			)
 
-	# Add global case option
+	# Add global option of type 'case'
 	elif (isCmdLineArgument('--option','-O')) \
 		and (isCmdLineArgument('--value','-V')) \
 		and (isCmdLineArgument('--file','-F')):
@@ -2076,16 +2289,6 @@ if isCmdLineArgument('--add','-a'):
 			getCmdLineArgument('--file','-F')
 			)
 
-	# Add option to case
-	elif (isCmdLineArgument('--option','-O')) \
-		and (isCmdLineArgument('--case','-C')) \
-		and (isCmdLineArgument('--value','-V')):
-		addOptionToCase(
-			getCmdLineArgument('--option','-O'),
-			getCmdLineArgument('--value','-V'),
-			getCmdLineArgument('--case','-C')
-			)
-
 	# Add file to global option
 	elif (isCmdLineArgument('--file','-F')) \
 		and (isCmdLineArgument('--option','-O')):
@@ -2093,23 +2296,6 @@ if isCmdLineArgument('--add','-a'):
 			getCmdLineArgument('--file','-F'),
 			getCmdLineArgument('--option','-O')
 			)
-
-	# Add case by menu
-	elif (isCmdLineArgument('--case','-C')) \
-		and isCmdLineArgument('--interactive','-i'):
-		addCaseByMenu(getCmdLineArgument('--case','-C'))
-
-	# Add case by copy
-	elif (isCmdLineArgument('--case','-C')) \
-		and isCmdLineArgument('--copy'):
-		addCaseByCopy(
-			getCmdLineArgument('--case','-C'),
-			getCmdLineArgument('--copy'),
-			)
-
-	# Add default case
-	elif isCmdLineArgument('--case','-C'):
-		addCase(getCmdLineArgument('--case','-C'))
 
 	# File
 	elif isCmdLineArgument('--file','-F'):
@@ -2121,32 +2307,14 @@ if isCmdLineArgument('--add','-a'):
 
 	# Runfile
 	elif isCmdLineArgument('--runFile'):
-		addRunFile(getCmdLineArgument('--runFile'))
+		addFileToOption(
+			getCmdLineArgument('--runFile'),
+			'runFiles'
+			)
 
 	# Unspecified
 	else:
 		printHelpAdd()
-
-# Build case
-elif isCmdLineArgument('--build','-b'):
-
-	if isCmdLineArgument('--case','-C'):
-		buildCase(getCmdLineArgument('--case','-C'))
-
-	else:
-		print('Missing case')
-
-# Clean builds
-elif isCmdLineArgument('--clean'):
-
-	# Removes build files without questioning
-	if (isCmdLineArgument('--case','-C')) \
-		and (isCmdLineArgument('--force','-f')):
-		delBuildCase(getCmdLineArgument('--case','-C'),True)
-
-	# Removes build files
-	elif (isCmdLineArgument('--case','-C')):
-		delBuildCase(getCmdLineArgument('--case','-C'))
 
 # Delete something
 elif isCmdLineArgument('--delete','-d'):
@@ -2158,24 +2326,6 @@ elif isCmdLineArgument('--delete','-d'):
 			getCmdLineArgument('--option','-O'),
 			getCmdLineArgument('--file','-F')
 		)
-
-	# Delete something from case or the case itself
-	elif isCmdLineArgument('--case','-C'):
-		
-		# Delete options having default values from case
-		if isCmdLineArgument('--default'):
-			delDefaultOptionsFromCase(getCmdLineArgument('--case','-C'))
-				
-		# Delete option from case (i.e., set it to default value)
-		elif isCmdLineArgument('--option','-O'):
-			delOptionFromCase(
-				getCmdLineArgument('--option','-O'),
-				getCmdLineArgument('--case','-C')
-				)
-		
-		# Delete case
-		else:
-			delCase(getCmdLineArgument('--case','-C'))
 
 	# Delete option
 	elif isCmdLineArgument('--option','-O'):
@@ -2192,26 +2342,8 @@ elif isCmdLineArgument('--export'):
 # Modify something
 elif isCmdLineArgument('--modify','-m'):
 
-	# Modify option of case
-	if (isCmdLineArgument('--case','-C')) \
-		and (isCmdLineArgument('--option','-O')) \
-		and (isCmdLineArgument('--value','-V')):
-		modOptionValueOfCase(
-			getCmdLineArgument('--case','-C'),
-			getCmdLineArgument('--option','-O'),
-			getCmdLineArgument('--value','-V')
-			)
-
-	# Modify name of case
-	elif (isCmdLineArgument('--case','-C')) and \
-		isCmdLineArgument('--name'):
-		modCaseName(
-			getCmdLineArgument('--case','-C'),
-			getCmdLineArgument('--name')
-			)
-
-	# Modify value of option
-	elif (isCmdLineArgument('--option','-O')) \
+	# Modify name of option
+	if (isCmdLineArgument('--option','-O')) \
 		and isCmdLineArgument('--name'):
 		modOptionName(
 			getCmdLineArgument('--option','-O'),
@@ -2233,17 +2365,8 @@ elif isCmdLineArgument('--modify','-m'):
 # Print something
 elif isCmdLineArgument('--print','-p'):
 
-	# Case including default options
-	if (isCmdLineArgument('--case','-C')) \
-		and isCmdLineArgument('--default'):
-		printCaseOptions(getCmdLineArgument('--case','-C'),True)
-
-	# Cases
-	elif (isCmdLineArgument('--case','-C')):
-		printCaseOptions(getCmdLineArgument('--case','-C'))
-
 	# Cases including default options
-	elif isCmdLineArgument('--cases') and isCmdLineArgument('--default'):
+	if isCmdLineArgument('--cases') and isCmdLineArgument('--default'):
 		printCases(True)
 
 	# Cases
@@ -2272,13 +2395,6 @@ elif isCmdLineArgument('--print','-p'):
 # Reset DB to initial state
 elif isCmdLineArgument('--reset'):
 	resetTables()
-
-# Builds case in auto mode and runs it afterwards
-elif isCmdLineArgument('--run','-r'):
-	if (isCmdLineArgument('--case','-C')):
-		runCase(getCmdLineArgument('--case','-C'))
-
-# Sets runfile
 
 # Options incorrect
 else:
