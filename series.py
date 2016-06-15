@@ -1190,7 +1190,7 @@ def getPartriarchCid(cid):
 	return cid
 
 # Returns name of run file and directory where it is located
-def  getRunFileAndDir(cid,runFid):
+def getRunFileAndDir(cid,runFid):
 	if debug: print('getRunFileAndDir: ',cid,runFid)
 
 	if not runFid:
@@ -1792,6 +1792,7 @@ def modOptionValueOfCid(cid,optName,optValue):
 		return
 
 	cid = verifyCid(cid)
+	oid = verifyOption(optName)
 	
 	# Get current option and value string from case
 	sqlCurs.execute('SELECT oidString,valueString FROM caseData WHERE cid=?',(cid,))
@@ -2108,7 +2109,6 @@ def runCase(caseName):
 	cid = isCase(caseName)
 	runCid(cid)
 
-
 # Builds case in auto mode, runs it afterwards
 def runCid(cid):
 	if debug: print('runCid: ',cid)
@@ -2119,6 +2119,7 @@ def runCid(cid):
 
 	buildCid(cid)
 
+	cwd = os.getcwd()
 	oid = isOption('runFiles')
 	runFids = getFidsOfOid(oid)
 	for runFid in runFids:
@@ -2127,6 +2128,7 @@ def runCid(cid):
 		os.chdir(runDir)
 		if debug: print('runCase: running ',runFile)
 		os.system("./"+runFile)
+		os.chdir(cwd)
 
 # Updates time of last build and increments number of builds
 def updateCaseBuildData(caseName):
