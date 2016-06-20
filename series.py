@@ -1732,7 +1732,7 @@ def modNameOfCid(cid,newName):
 		sys.exit(1)
 	
 	insert = (newName,cid)
-	sqlCurs.execute('UPDATE cases SET caseName=? WHERE cid=?',insert)
+	sqlCurs.execute('UPDATE cases SET caseName=? WHERE currentCid=?',insert)
 
 # Changes the name of option
 def modOptionName(optName,newName):
